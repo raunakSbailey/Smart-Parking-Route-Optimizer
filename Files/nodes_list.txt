@@ -1,0 +1,6 @@
+0 Char_Khamba 0
+1 Gate_2 5
+2 Silver_Jubilee 20
+3 Btech_Block 15
+4 Gate_1 5
+5 CSIT 10

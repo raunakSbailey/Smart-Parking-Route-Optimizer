@@ -13,7 +13,7 @@ int main () {
     getline (cin, s);
 
     if (s.size()) {
-        "{ \"contents\": [ { \"parts\": [ { \"text\": \"" + s + "\" } ] } ] }";
+        "{ \"contents\": [ { \"parts\": [ { \"text\": s } ] } ] }";
     } 
 
     
