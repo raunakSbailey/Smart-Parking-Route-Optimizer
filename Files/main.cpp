@@ -1,16 +1,70 @@
-#include <iostream>
-#include <vector>
-#include <string>
-#include <fstream>
-#include <sstream>
-#include <limits>
-#include <queue>
-#include <map>
+#include <bits/stdc++.h>
 
 using namespace std;
 
 const int MAX_NODES = 20;
 const int INF = numeric_limits<int>::max();
+
+class User {
+    private:
+        string currentUserName;
+
+    public:
+        User () {
+            currentUserName = "admin";
+        }
+
+        bool userLogin (string userName, string userPassword) {
+            if (userName == "admin" && userPassword == "123") return true;
+
+            vector <string> userNames; //Remember that you have to store the names in sorted form later
+            vector <string> userPasswords;
+
+            ifstream names ("E:\\Smart-Parking-Route-Optimizer\\Files\\UserFiles\\userNames.txt");
+            ifstream passwords ("E:\\Smart-Parking-Route-Optimizer\\Files\\UserFiles\\userPasswords.txt");
+
+            string name, password;
+
+            for (int i = 0; getline (names, name); ++i) {
+                userNames.push_back (name);
+            }
+
+            while (getline (passwords, password)) {
+                userPasswords.push_back (password);
+            }
+
+            for (int i = 0; i < userNames.size (); ++i) {
+                if (userNames [i] == userName && userPasswords [i] == userPassword) {
+                    currentUserName = userName;
+                    return true;
+                }
+            }
+
+            currentUserName = "Unidentified";
+
+            names.close ();
+            passwords.close ();
+
+            return false;
+        }
+
+        bool userRegister (string userName, string userPassword) {
+            ofstream userNames (".\\UserFiles\\userNames.txt", ios::app);
+            ofstream userPasswords (".\\UserFiles\\userPasswords.txt", ios::app);
+
+            userNames << userName << endl;
+            userPasswords << userPassword << endl;
+
+            currentUserName = userName;
+
+            userNames.close ();
+            userPasswords.close ();
+
+            return true;
+        }
+
+        string getUserName () {return currentUserName;}
+};
 
 
 struct CampusBlock {
@@ -70,7 +124,7 @@ public:
         int dest = getBlockId(end);
 
         if (src == -1 || dest == -1) {
-            cout << "Block name not recognized. Use underscores for spaces (e.g., Gate_1).\n";
+            cout << "Block name not recognized.\n";
             return;
         }
 
@@ -131,13 +185,55 @@ public:
             cout << "Updated " << name << " occupancy.\n";
         }
     }
+
+    bool initiateParking (int slotID, string userName, int fromHour, int fromMin, int toHour, int toMin) {
+        if (slotID < 0) false;
+
+        CampusBlock& tempBlock = blocks [slotID];
+
+        if (tempBlock.occupiedSlots < tempBlock.parkingCapacity) {
+            tempBlock.occupiedSlots++;
+            return true;
+        } else {
+            return false;
+        }
+    }
 };
 
 int main() {
+    User user;
+
+    cout << "1. Login" << endl << "2. Register" << endl << ": ";
+    int choice;
+    cin >> choice;
+
+    if (choice == 1) {
+        cout << "Please enter your Username and Password (uN pW): ";
+        string userName, userPassword;
+        cin >> userName >> userPassword;
+
+        if (!user.userLogin (userName, userPassword)) {
+            cout << "Please enter correct details." << endl;
+            exit (0);
+        }
+
+        cout << "Welcome! " << userName << endl;
+    } else {
+        cout << "Please enter your Username and Password (uN pW): ";
+        string userName, userPassword;
+        cin >> userName >> userPassword;
+
+        if (!user.userRegister (userName, userPassword)) {
+            cout << "Please enter correct details." << endl;
+            exit (0);
+        }
+
+        cout << "Welcome! " << userName << endl;
+    }
+
     CampusNavigator uniMap;
     uniMap.loadCampusData("nodes_list.txt", "adjacency_matrix.txt");
 
-    int choice;
     while (true) {
         cout << "\n--- University Travel Assistant ---\n";
         cout << "1. Find Route & Check Parking\n2. Update Block Parking (Admin)\n3. Exit\nChoice: ";
@@ -149,8 +245,29 @@ int main() {
         if (choice == 1) {
             cout << "Current Location: "; cin.ignore(); getline (cin, b1);
             cout << "Destination Block: "; getline (cin, b2);
-            cout << b1 << " " << b2 << endl;
+            cout << "Route from: " << b1 << endl << "To: " << b2 << endl;
             uniMap.findCampusRoute(b1, b2);
+
+            cout << "Do you want to book? (1/0) ";
+            cin >> choice;
+
+            if (choice) {
+                int blockID = uniMap.getBlockId (b2);
+
+                int fromHour, fromMin, toHour, toMin;
+
+                cout << "Please enter start time (Hour Min): ";
+                cin >> fromHour >> fromMin;
+
+                cout << "Please enter end time (Hour Min): ";
+                cin >> toHour >> toMin;
+
+                if (uniMap.initiateParking (blockID, user.getUserName(), fromHour, fromMin, toHour, toMin)) {
+                    cout << "Parking is Book!" << endl;
+                } else {
+                    cout << "An Error has occured (404)" << endl;
+                }
+            }
         } else if (choice == 2) {
             int change;
             cout << "Block Name: "; cin >> b1;
@@ -160,3 +277,8 @@ int main() {
     }
     return 0;
 }
+
+
+/*
+To Do
+1. Add QR code generator*/
