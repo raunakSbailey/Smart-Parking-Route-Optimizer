@@ -89,31 +89,64 @@ public:
     }
 
     void loadCampusData(string cityFile, string adjFile) {
+        blocks.clear();
+        numBlocks = 0;
+
+        for (int i = 0; i < MAX_NODES; i++) {
+            adjList[i].clear();
+        }
+
         ifstream cFile(cityFile);
+        if (!cFile) {
+            cout << "ERROR: Cannot open " << cityFile << endl;
+            return;
+        }
+
         int id, cap;
         string name;
+
         while (cFile >> id >> name >> cap) {
             blocks[id] = {id, name, cap, 0};
             numBlocks++;
         }
 
+        cFile.close();
+
+        cout << "Blocks loaded: " << numBlocks << endl;
+
+        if (numBlocks == 0) {
+            cout << "ERROR: No blocks loaded\n";
+            return;
+        }
+
         ifstream aFile(adjFile);
-        string line;
-        int row = 0;
-        while (getline(aFile, line)) {
-            stringstream ss(line);
-            string val;
-            int col = 0;
-            while (getline(ss, val, ',')) {
-                int weight = stoi (val);
+        if (!aFile) {
+            cout << "ERROR: Cannot open " << adjFile << endl;
+            return;
+        }
 
-                while (weight != 0) {
-                    adjList [row].push_back ({col, weight});
-                }
+        int u, v, weight;
 
-                col++;
+        while (aFile >> u >> v >> weight) {
+            if (u >= MAX_NODES || v >= MAX_NODES) {
+                cout << "WARNING: Invalid edge skipped (" << u << "," << v << ")\n";
+                continue;
             }
-            row++;
+
+            adjList[u].push_back({v, weight});
+            adjList[v].push_back({u, weight}); 
+        }
+
+        aFile.close();
+
+        cout << "Adjacency list loaded successfully\n";
+
+        for (int i = 0; i < numBlocks; i++) {
+            cout << "Node " << i << " -> ";
+            for (auto &edge : adjList[i]) {
+                cout << "(" << edge.first << "," << edge.second << ") ";
+            }
+            cout << endl;
         }
     }
 
@@ -137,7 +170,6 @@ public:
         vector<int> parent(MAX_NODES, -1);
         vector<bool> visited(MAX_NODES, false);
 
-        // 🔥 Min Heap (distance, node)
         priority_queue<pair<int,int>, vector<pair<int,int>>, greater<>> pq;
 
         dist[src] = 0;
@@ -150,7 +182,6 @@ public:
             if (visited[u]) continue;
             visited[u] = true;
 
-            // 🚀 Traverse adjacency list
             for (auto &[v, weight] : adjList[u]) {
                 if (currDist + weight < dist[v]) {
                     dist[v] = currDist + weight;
