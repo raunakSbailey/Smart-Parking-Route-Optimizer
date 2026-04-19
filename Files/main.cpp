@@ -17,11 +17,11 @@ class User {
         bool userLogin (string userName, string userPassword) {
             if (userName == "admin" && userPassword == "123") return true;
 
-            vector <string> userNames; //Remember that you have to store the names in sorted form later
+            vector <string> userNames; 
             vector <string> userPasswords;
 
-            ifstream names ("E:\\Smart-Parking-Route-Optimizer\\Files\\UserFiles\\userNames.txt");
-            ifstream passwords ("E:\\Smart-Parking-Route-Optimizer\\Files\\UserFiles\\userPasswords.txt");
+            ifstream names (".\\UserFiles\\userNames.txt");
+            ifstream passwords (".\\UserFiles\\userPasswords.txt");
 
             string name, password;
 
@@ -77,15 +77,15 @@ struct CampusBlock {
 
 class CampusNavigator {
 private:
-    int trafficMatrix[MAX_NODES][MAX_NODES];
+    vector<pair<int,int>> adjList[MAX_NODES];
     map<int, CampusBlock> blocks;
     int numBlocks = 0;
 
 public:
     CampusNavigator() {
-        for (int i = 0; i < MAX_NODES; i++)
-            for (int j = 0; j < MAX_NODES; j++)
-                trafficMatrix[i][j] = 0;
+        for (int i = 0; i < MAX_NODES; i++) {
+            adjList[i].clear();
+        }
     }
 
     void loadCampusData(string cityFile, string adjFile) {
@@ -105,7 +105,12 @@ public:
             string val;
             int col = 0;
             while (getline(ss, val, ',')) {
-                trafficMatrix[row][col] = stoi(val);
+                int weight = stoi (val);
+
+                while (weight != 0) {
+                    adjList [row].push_back ({col, weight});
+                }
+
                 col++;
             }
             row++;
@@ -131,20 +136,26 @@ public:
         vector<int> dist(MAX_NODES, INF);
         vector<int> parent(MAX_NODES, -1);
         vector<bool> visited(MAX_NODES, false);
-        dist[src] = 0;
 
-        for (int i = 0; i < numBlocks - 1; i++) {
-            int u = -1;
-            for (int j = 0; j < numBlocks; j++) {
-                if (!visited[j] && (u == -1 || dist[j] < dist[u])) u = j;
-            }
-            if (dist[u] == INF) break;
+        // 🔥 Min Heap (distance, node)
+        priority_queue<pair<int,int>, vector<pair<int,int>>, greater<>> pq;
+
+        dist[src] = 0;
+        pq.push({0, src});
+
+        while (!pq.empty()) {
+            auto [currDist, u] = pq.top();
+            pq.pop();
+
+            if (visited[u]) continue;
             visited[u] = true;
 
-            for (int v = 0; v < numBlocks; v++) {
-                if (trafficMatrix[u][v] != 0 && dist[u] + trafficMatrix[u][v] < dist[v]) {
-                    dist[v] = dist[u] + trafficMatrix[u][v];
+            // 🚀 Traverse adjacency list
+            for (auto &[v, weight] : adjList[u]) {
+                if (currDist + weight < dist[v]) {
+                    dist[v] = currDist + weight;
                     parent[v] = u;
+                    pq.push({dist[v], v});
                 }
             }
         }
@@ -187,7 +198,7 @@ public:
     }
 
     bool initiateParking (int slotID, string userName, int fromHour, int fromMin, int toHour, int toMin) {
-        if (slotID < 0) false;
+        if (slotID < 0) return false;
 
         CampusBlock& tempBlock = blocks [slotID];
 
@@ -200,10 +211,12 @@ public:
     }
 };
 
-int main() {
-    User user;
+User user;
+CampusNavigator uniMap;
+bool isAdmin;
 
-    cout << "1. Login" << endl << "2. Register" << endl << ": ";
+void startUp () {
+    cout << "1. Login\n2. Register\n: ";
     int choice;
     cin >> choice;
 
@@ -230,16 +243,28 @@ int main() {
 
         cout << "Welcome! " << userName << endl;
     }
+}
 
-    CampusNavigator uniMap;
-    uniMap.loadCampusData("nodes_list.txt", "adjacency_matrix.txt");
+void loadMaps () {
+    uniMap.loadCampusData("nodes_list.txt", "adjacency_list.txt");
+
+    isAdmin = (user.getUserName() == "admin");
+}
+
+void initialApplicationStartUp () {
+    int choice;
 
     while (true) {
         cout << "\n--- University Travel Assistant ---\n";
-        cout << "1. Find Route & Check Parking\n2. Update Block Parking (Admin)\n3. Exit\nChoice: ";
+        cout << "1. Find Route & Check Parking\n";
+        if (isAdmin) {
+            cout << "2. Update Block Parking (Admin)\n";
+            cout << "3. Modify Campus Graph Data (Admin)\n";
+        }
+        cout << "4. Exit\nChoice: ";
         cin >> choice;
 
-        if (choice == 3) break;
+        if (choice == 4) break;
 
         string b1, b2;
         if (choice == 1) {
@@ -253,7 +278,6 @@ int main() {
 
             if (choice) {
                 int blockID = uniMap.getBlockId (b2);
-
                 int fromHour, fromMin, toHour, toMin;
 
                 cout << "Please enter start time (Hour Min): ";
@@ -263,22 +287,90 @@ int main() {
                 cin >> toHour >> toMin;
 
                 if (uniMap.initiateParking (blockID, user.getUserName(), fromHour, fromMin, toHour, toMin)) {
-                    cout << "Parking is Book!" << endl;
+                    cout << "Parking is Booked!" << endl;
                 } else {
                     cout << "An Error has occured (404)" << endl;
                 }
             }
         } else if (choice == 2) {
+            if (!isAdmin) {
+                cout << "Access Denied. Admin privileges required.\n";
+                continue;
+            }
             int change;
             cout << "Block Name: "; cin >> b1;
             cout << "Change (e.g., 1 for entry, -1 for exit): "; cin >> change;
             uniMap.updateOccupancy(b1, change);
+        } else if (choice == 3) {
+            if (!isAdmin) {
+                cout << "Access Denied. Admin privileges required.\n";
+                continue;
+            }
+            
+            int adminChoice;
+            cout << "\n--- Graph Modification ---\n";
+            cout << "1. Enter New Graph Data\n";
+            cout << "2. Update Existing Graph\n";
+            cout << "Choice: ";
+            cin >> adminChoice;
+
+            if (adminChoice == 1) {
+                int n;
+                cout << "Enter number of blocks: ";
+                cin >> n;
+
+                ofstream f1("nodes_list.txt");
+                vector<string> names(n);
+
+                for (int i = 0; i < n; i++) {
+                    string bName;
+                    int cap;
+                    cout << "Name for block " << i << ": ";
+                    cin >> bName;
+                    cout << "Capacity: ";
+                    cin >> cap;
+                    
+                    names[i] = bName;
+                    f1 << i << " " << bName << " " << cap << endl;
+                }
+                f1.close();
+
+                ofstream f2("adjacency_matrix.txt");
+                for (int i = 0; i < n; i++) {
+                    for (int j = 0; j < n; j++) {
+                        int w = 0;
+                        if (i != j) {
+                            cout << "Weight " << names[i] << " to " << names[j] << ": ";
+                            cin >> w;
+                        }
+                        f2 << w << (j == n - 1 ? "" : ",");
+                    }
+                    f2 << endl;
+                }
+                f2.close();
+
+                cout << "Done. Files saved. Reloading campus map...\n";
+                uniMap = CampusNavigator(); 
+                uniMap.loadCampusData("nodes_list.txt", "adjacency_matrix.txt");
+            } else if (adminChoice == 2) {
+                cout << "Feature 'Update Graph' coming soon...\n";
+            } else {
+                cout << "Invalid choice.\n";
+            }
+        } else {
+            cout << "Invalid choice.\n";
         }
     }
-    return 0;
 }
 
 
-/*
-To Do
-1. Add QR code generator*/
+int main() {
+    
+    startUp ();
+    cout << "Startup Worked" << endl;
+    loadMaps ();
+    cout << "Loading Maps Worked" << endl;
+    initialApplicationStartUp ();
+    
+    return 0;
+}

@@ -1,4 +1,4 @@
-0 Char_Khamba 0
+0 Char_Khamba 10
 1 Gate_2 5
 2 Silver_Jubilee 20
 3 Btech_Block 15
