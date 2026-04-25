@@ -2,7 +2,6 @@
 using namespace std;
 
 struct Node{
-
     int id;
     string name;
     int capacity;
@@ -16,28 +15,22 @@ class SmartParking{
 public:
 
     map<int,Node> nodes;
-
     map<int,vector<pair<int,int>>> road;
     map<int,vector<pair<int,int>>> transport;
-
     map<int,map<int,int>> slots;
-
     map<pair<int,int>,vector<int>> visualPaths;
 
     SmartParking(){
-
         loadNodes();
-
         loadGraph();
-
         loadTransport();
-
         buildVisualPaths();
     }
 
     void loadNodes(){
 
         nodes.clear();
+        slots.clear();
 
         ifstream file("nodes_list.txt");
 
@@ -47,30 +40,23 @@ public:
         double x,y;
         int ghost;
 
-        while(
-            file >>
-            id >>
-            name >>
-            cap >>
-            x >>
-            y >>
-            ghost
-        ){
+        while(file >> id >> name >> cap >> x >> y >> ghost){
 
             Node n;
-
             n.id=id;
             n.name=name;
             n.capacity=cap;
             n.x=x;
             n.y=y;
-            n.ghost=ghost;
+            n.ghost=(ghost==1);
 
             nodes[id]=n;
 
-            for(int h=0;h<24;h++){
-
-                slots[id][h]=cap;
+            // Only init slots for real nodes with actual capacity
+            if(!n.ghost && cap > 0){
+                for(int h=0;h<24;h++){
+                    slots[id][h]=cap;
+                }
             }
         }
 
@@ -86,7 +72,6 @@ public:
         int u,v,w;
 
         while(file>>u>>v>>w){
-
             road[u].push_back({v,w});
             road[v].push_back({u,w});
         }
@@ -103,7 +88,6 @@ public:
         int u,v;
 
         while(file>>u>>v){
-
             transport[u].push_back({v,1});
             transport[v].push_back({u,1});
         }
@@ -113,101 +97,117 @@ public:
 
     void buildVisualPaths(){
 
-        visualPaths[{0,3}]={1,2};
-        visualPaths[{3,6}]={4,5};
-        visualPaths[{6,8}]={7};
+        // Format: {realNodeA, realNodeB} -> list of ghost node IDs between them
+        // These are the ghost nodes that lie on the road between two real nodes.
+        // Add both directions.
 
-        visualPaths[{0,15}]={9,10,11,13,14};
+        auto addPath = [&](int a, int b, vector<int> ghosts){
+            visualPaths[{a,b}] = ghosts;
+            vector<int> rev(ghosts.rbegin(), ghosts.rend());
+            visualPaths[{b,a}] = rev;
+        };
 
-        visualPaths[{12,24}]={22,23};
+        // Clock Tower (0) <-> Railway Station (3) via Araghar (56)
+        // path: 0 -> [1,2] -> 3
+        addPath(0, 3, {1,2});
 
-        visualPaths[{24,0}]={25,26};
+        // Railway Station (3) <-> Pacific Mall (6) via Subhash Nagar (54)
+        addPath(3, 6, {4,5});
 
-        visualPaths[{8,27}]={28,29};
+        // Pacific Mall (6) <-> ISBT (8)
+        addPath(6, 8, {7});
 
-        visualPaths[{0,30}]={31,32};
+        // Clock Tower (0) <-> Ballupur (12)
+        addPath(0, 12, {9,10,11});
 
-        visualPaths[{15,33}]={34,35};
+        // Ballupur (12) <-> Rajpur Road (15)
+        addPath(12, 15, {13,14});
 
-        visualPaths[{33,36}]={37,38};
+        // Ballupur (12) <-> ONGC (24)
+        addPath(12, 24, {22,23});
 
-        visualPaths[{36,39}]={41,40};
+        // ONGC (24) <-> Clock Tower (0)
+        addPath(24, 0, {25,26});
 
-        visualPaths[{33,42}]={43,44};
+        // ISBT (8) <-> Clement Town (27)
+        addPath(8, 27, {28,29});
 
-        visualPaths[{42,48}]={49,50};
+        // Clock Tower (0) <-> Prince Chowk (30)
+        addPath(0, 30, {31,32});
 
-        visualPaths[{8,51}]={52,53};
+        // Rajpur Road (15) <-> Jakhan (33)
+        addPath(15, 33, {34,35});
 
-        visualPaths[{6,54}]={55};
+        // Jakhan (33) <-> Mussoorie Diversion (36)
+        addPath(33, 36, {37,38});
 
-        visualPaths[{3,56}]={57,58};
+        // Mussoorie Diversion (36) <-> Sahastradhara (39)
+        addPath(36, 39, {40,41});
 
-        visualPaths[{8,65}]={66,67};
+        // Jakhan (33) <-> IT Park (42)
+        addPath(33, 42, {43,44});
 
-        visualPaths[{0,62}]={63,64};
+        // IT Park (42) <-> DIT University (48)
+        addPath(42, 48, {49,50});
 
-        visualPaths[{0,68}]={69,70};
+        // ISBT (8) <-> Graphic Era (51)
+        addPath(8, 51, {52,53});
 
+        // ISBT (8) <-> Subhash Nagar (54)
+        addPath(8, 54, {});  // direct, no ghost needed
 
+        // Pacific Mall (6) <-> Subhash Nagar (54)
+        addPath(6, 54, {55});
 
-        visualPaths[{3,0}]={2,1};
+        // Railway Station (3) <-> Araghar (56)
+        addPath(3, 56, {57,58});
 
-        visualPaths[{6,3}]={5,4};
+        // Araghar (56) <-> Clock Tower (0) via Prince Chowk
+        addPath(56, 0, {});
 
-        visualPaths[{8,6}]={7};
+        // ISBT (8) <-> Rispana (65)
+        addPath(8, 65, {66,67});
 
-        visualPaths[{15,0}]={14,13,11,10,9};
+        // Clock Tower (0) <-> Doon Hospital (62)
+        addPath(0, 62, {63,64});
 
-        visualPaths[{24,12}]={23,22};
+        // Doon Hospital (62) <-> Fountain Chowk (68)
+        addPath(62, 68, {69,70});
 
-        visualPaths[{0,24}]={26,25};
+        // Fountain Chowk (68) <-> Parade Ground (45)
+        addPath(68, 45, {});
 
-        visualPaths[{27,8}]={29,28};
+        // Parade Ground (45) <-> Prince Chowk (30)
+        addPath(45, 30, {46,47});
 
-        visualPaths[{30,0}]={32,31};
+        // Parade Ground (45) <-> ONGC (24)
+        addPath(45, 24, {});
 
-        visualPaths[{33,15}]={35,34};
+        // ONGC (24) <-> Rispana (65)
+        addPath(24, 65, {});
 
-        visualPaths[{36,33}]={38,37};
+        // Prem Nagar (21) <-> Subhash Nagar (54)
+        addPath(21, 54, {});
 
-        visualPaths[{39,36}]={40,41};
-
-        visualPaths[{42,33}]={44,43};
-
-        visualPaths[{48,42}]={50,49};
-
-        visualPaths[{51,8}]={53,52};
-
-        visualPaths[{54,6}]={55};
-
-        visualPaths[{56,3}]={58,57};
-
-        visualPaths[{65,8}]={67,66};
-
-        visualPaths[{62,0}]={64,63};
-
-        visualPaths[{68,0}]={70,69};
+        // Prem Nagar (21) <-> ISBT (8)
+        addPath(21, 8, {});
     }
 
-    int getId(string name){
+    int getId(const string& name) const{
 
-        for(auto &p:nodes){
-
-            if(p.second.name==name){
-
+        for(const auto &p : nodes){
+            if(p.second.name == name){
                 return p.first;
             }
         }
-
         return -1;
     }
 
     vector<int> dijkstra(
         int src,
         int dest,
-        map<int,vector<pair<int,int>>>& graph
-    ){
+        const map<int,vector<pair<int,int>>>& graph
+    ) const {
 
         priority_queue<
             pair<int,int>,
@@ -218,125 +218,101 @@ public:
         map<int,int> dist;
         map<int,int> parent;
 
-        for(auto &p:nodes){
-
-            dist[p.first]=1e9;
+        for(const auto &p : nodes){
+            if(!p.second.ghost){
+                dist[p.first] = INT_MAX;
+            }
         }
 
-        dist[src]=0;
+        if(dist.find(src) == dist.end() || dist.find(dest) == dist.end()){
+            return {};
+        }
 
-        pq.push({0,src});
+        dist[src] = 0;
+        pq.push({0, src});
 
         while(!pq.empty()){
 
-            auto top=pq.top();
+            auto [cost, node] = pq.top();
             pq.pop();
 
-            int node=top.second;
+            if(cost > dist[node]) continue;
 
-            for(auto &edge:graph[node]){
+            if(graph.count(node)){
+                for(const auto &[next, wt] : graph.at(node)){
 
-                int next=edge.first;
-                int wt=edge.second;
+                    if(nodes.count(next) && nodes.at(next).ghost)
+                        continue;
 
-                if(
-                    dist[node]+wt
-                    <
-                    dist[next]
-                ){
-
-                    dist[next]=dist[node]+wt;
-
-                    parent[next]=node;
-
-                    pq.push({
-                        dist[next],
-                        next
-                    });
+                    if(dist.count(next) && dist[node] + wt < dist[next]){
+                        dist[next] = dist[node] + wt;
+                        parent[next] = node;
+                        pq.push({dist[next], next});
+                    }
                 }
             }
         }
 
-        vector<int> path;
-
-        if(dist[dest]==1e9){
-
-            return path;
+        if(!dist.count(dest) || dist[dest] == INT_MAX){
+            return {};
         }
 
-        int cur=dest;
+        vector<int> path;
+        int cur = dest;
 
-        while(cur!=src){
-
+        while(cur != src){
             path.push_back(cur);
-
-            cur=parent[cur];
+            if(!parent.count(cur)) return {};
+            cur = parent[cur];
         }
 
         path.push_back(src);
-
-        reverse(
-            path.begin(),
-            path.end()
-        );
+        reverse(path.begin(), path.end());
 
         return path;
     }
 
-    vector<int> buildVisualRoute(
-        vector<int>& realPath
-    ){
+    vector<int> buildVisualRoute(const vector<int>& realPath) const {
 
         vector<int> finalPath;
 
-        if(realPath.empty()){
+        if(realPath.empty()) return finalPath;
 
-            return finalPath;
-        }
+        for(int i = 0; i < (int)realPath.size()-1; i++){
 
-        for(
-            int i=0;
-            i<realPath.size()-1;
-            i++
-        ){
-
-            int a=realPath[i];
-            int b=realPath[i+1];
+            int a = realPath[i];
+            int b = realPath[i+1];
 
             finalPath.push_back(a);
 
-            pair<int,int> key={a,b};
+            auto key = make_pair(a,b);
+            auto it = visualPaths.find(key);
 
-            if(visualPaths.count(key)){
-
-                for(int g:visualPaths[key]){
-
+            if(it != visualPaths.end()){
+                for(int g : it->second){
                     finalPath.push_back(g);
                 }
             }
         }
 
-        finalPath.push_back(
-            realPath.back()
-        );
+        finalPath.push_back(realPath.back());
 
         return finalPath;
     }
 
-    bool availableAtTime(
-        int node,
-        int startH,
-        int endH
-    ){
+    bool availableAtTime(int node, int startH, int endH) const {
 
-        for(
-            int h=startH;
-            h<endH;
-            h++
-        ){
+        // Validate range
+        if(startH < 0 || endH > 24 || startH >= endH) return false;
 
-            if(slots[node][h]<=0){
+        // Ghost nodes can never be parked at
+        if(!nodes.count(node) || nodes.at(node).ghost) return false;
 
+        if(!slots.count(node)) return false;
+
+        for(int h = startH; h < endH; h++){
+            const auto& nodeSlots = slots.at(node);
+            if(!nodeSlots.count(h) || nodeSlots.at(h) <= 0){
                 return false;
             }
         }
@@ -344,65 +320,52 @@ public:
         return true;
     }
 
-    void reserveSlot(
-        int node,
-        int startH,
-        int endH
-    ){
+    void reserveSlot(int node, int startH, int endH){
 
-        for(
-            int h=startH;
-            h<endH;
-            h++
-        ){
+        if(startH < 0 || endH > 24 || startH >= endH) return;
+        if(!slots.count(node)) return;
 
-            slots[node][h]--;
+        for(int h = startH; h < endH; h++){
+            if(slots[node].count(h) && slots[node][h] > 0){
+                slots[node][h]--;
+            }
         }
     }
 
+    // Find fallback parking along the REAL path (not visual)
     int fallbackParking(
-        vector<int>& path,
+        const vector<int>& realPath,
         int startH,
         int endH
     ){
+        // Search backwards from destination
+        for(int i = (int)realPath.size()-1; i >= 0; i--){
 
-        for(int id:path){
+            int id = realPath[i];
 
-            if(nodes[id].ghost){
+            if(!nodes.count(id) || nodes[id].ghost) continue;
 
-                continue;
-            }
-
-            if(
-                availableAtTime(
-                    id,
-                    startH,
-                    endH
-                )
-            ){
-
+            if(availableAtTime(id, startH, endH)){
                 return id;
             }
         }
-
         return -1;
     }
 
-    void updateCapacity(
-        int id,
-        int cap
-    ){
+    // Update capacity WITHOUT wiping existing reservations.
+    // Only updates the base capacity for display; reservations are kept.
+    void updateCapacity(int id, int newCap){
 
-        if(!nodes.count(id)){
+        if(!nodes.count(id)) return;
 
-            return;
-        }
+        int oldCap = nodes[id].capacity;
+        nodes[id].capacity = newCap;
 
-        nodes[id].capacity=cap;
-
-        for(int h=0;h<24;h++){
-
-            slots[id][h]=cap;
+        // Adjust slots proportionally: only change free slots, not reserved ones
+        for(int h = 0; h < 24; h++){
+            int reserved = oldCap - slots[id][h];
+            reserved = max(0, reserved);
+            slots[id][h] = max(0, newCap - reserved);
         }
 
         saveNodes();
@@ -410,22 +373,17 @@ public:
 
     void saveNodes(){
 
-        ofstream file(
-            "nodes_list.txt"
-        );
+        ofstream file("nodes_list.txt");
 
-        for(auto &p:nodes){
-
-            auto n=p.second;
-
-            file
-            <<n.id<<" "
-            <<n.name<<" "
-            <<n.capacity<<" "
-            <<n.x<<" "
-            <<n.y<<" "
-            <<n.ghost
-            <<endl;
+        for(const auto &p : nodes){
+            const auto &n = p.second;
+            file << n.id << " "
+                 << n.name << " "
+                 << n.capacity << " "
+                 << n.x << " "
+                 << n.y << " "
+                 << (n.ghost ? 1 : 0)
+                 << "\n";
         }
 
         file.close();

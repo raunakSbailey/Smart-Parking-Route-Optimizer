@@ -8,31 +8,21 @@ bool loginUser(
     const string& pass,
     string& role
 ){
-
     ifstream file("./UserFiles/users.txt");
 
-    if(!file.is_open())
-        return false;
+    if(!file.is_open()) return false;
 
     string u,p,r;
 
     while(file >> u >> p >> r){
-
-        if(
-            u == user &&
-            p == pass
-        ){
-
+        if(u == user && p == pass){
             role = r;
-
             file.close();
-
             return true;
         }
     }
 
     file.close();
-
     return false;
 }
 
@@ -40,17 +30,12 @@ bool registerUser(
     const string& user,
     const string& pass
 ){
-
-    ifstream check(
-        "./UserFiles/users.txt"
-    );
+    ifstream check("./UserFiles/users.txt");
 
     string u,p,r;
 
     while(check >> u >> p >> r){
-
         if(u == user){
-
             check.close();
             return false;
         }
@@ -58,17 +43,8 @@ bool registerUser(
 
     check.close();
 
-    ofstream file(
-        "./UserFiles/users.txt",
-        ios::app
-    );
-
-    file
-    << user
-    << " "
-    << pass
-    << " user\n";
-
+    ofstream file("./UserFiles/users.txt", ios::app);
+    file << user << " " << pass << " user\n";
     file.close();
 
     return true;
@@ -78,8 +54,7 @@ int main(){
 
     crow::SimpleApp app;
 
-    CROW_ROUTE(app,"/")
-    ([]{
+    CROW_ROUTE(app,"/")([]{ 
 
         ifstream file("index.html");
 
@@ -96,29 +71,17 @@ int main(){
 
         crow::json::wvalue res;
 
-        auto userParam =
-        req.url_params.get("user");
+        auto userParam = req.url_params.get("user");
+        auto passParam = req.url_params.get("pass");
 
-        auto passParam =
-        req.url_params.get("pass");
-
-        string user =
-        userParam ? string(userParam) : "";
-
-        string pass =
-        passParam ? string(passParam) : "";
-
+        string user = userParam ? string(userParam) : "";
+        string pass = passParam ? string(passParam) : "";
         string role = "user";
 
-        bool ok =
-        loginUser(
-            user,
-            pass,
-            role
-        );
+        bool ok = loginUser(user, pass, role);
 
         res["success"] = ok;
-        res["role"] = role;
+        res["role"]    = role;
 
         return crow::response(res);
     });
@@ -128,29 +91,16 @@ int main(){
 
         crow::json::wvalue res;
 
-        auto userParam =
-        req.url_params.get("user");
+        auto userParam = req.url_params.get("user");
+        auto passParam = req.url_params.get("pass");
 
-        auto passParam =
-        req.url_params.get("pass");
+        string user = userParam ? string(userParam) : "";
+        string pass = passParam ? string(passParam) : "";
 
-        string user =
-        userParam ? string(userParam) : "";
-
-        string pass =
-        passParam ? string(passParam) : "";
-
-        bool ok =
-        registerUser(
-            user,
-            pass
-        );
+        bool ok = registerUser(user, pass);
 
         res["success"] = ok;
-
-        if(!ok)
-            res["error"] =
-            "User already exists";
+        if(!ok) res["error"] = "User already exists";
 
         return crow::response(res);
     });
@@ -159,21 +109,27 @@ int main(){
     ([]{
 
         crow::json::wvalue res;
-
-        int i=0;
+        int i = 0;
 
         for(auto &p : sys.nodes){
 
             auto n = p.second;
 
-            if(n.ghost)
-                continue;
+            if(n.ghost) continue;
 
-            res[i]["id"] = n.id;
-            res[i]["name"] = n.name;
+            res[i]["id"]       = n.id;
+            res[i]["name"]     = n.name;
             res[i]["capacity"] = n.capacity;
-            res[i]["x"] = n.x;
-            res[i]["y"] = n.y;
+            res[i]["x"]        = n.x;
+            res[i]["y"]        = n.y;
+
+            // Also send current available slots for hour 0 (or current hour)
+            // so frontend can show live availability
+            int curHour = 10; // default preview hour
+            int available = sys.slots.count(n.id) && sys.slots[n.id].count(curHour)
+                            ? sys.slots[n.id][curHour] : 0;
+
+            res[i]["available"] = available;
 
             i++;
         }
@@ -186,207 +142,135 @@ int main(){
 
         crow::json::wvalue res;
 
-        auto s =
-        req.url_params.get("start");
+        auto s  = req.url_params.get("start");
+        auto e  = req.url_params.get("end");
+        auto sh = req.url_params.get("startH");
+        auto eh = req.url_params.get("endH");
 
-        auto e =
-        req.url_params.get("end");
+        int startH = sh ? stoi(sh) : 10;
+        int endH   = eh ? stoi(eh) : 12;
 
-        auto sh =
-        req.url_params.get("startH");
-
-        auto eh =
-        req.url_params.get("endH");
-
-        int startH =
-        sh ? stoi(sh) : 10;
-
-        int endH =
-        eh ? stoi(eh) : 12;
-
-        int src =
-        sys.getId(s ? s : "");
-
-        int dest =
-        sys.getId(e ? e : "");
-
-        if(src==-1 || dest==-1){
-
-            res["error"] =
-            "Invalid nodes";
-
+        // ---- BUG FIX: validate hour range ----
+        if(startH < 0 || endH > 24 || startH >= endH){
+            res["error"] = "Invalid hours. startH must be < endH, both in [0,24]";
             return crow::response(res);
         }
 
-        auto realPath =
-        sys.dijkstra(
-            src,
-            dest,
-            sys.road
-        );
+        int src  = sys.getId(s ? s : "");
+        int dest = sys.getId(e ? e : "");
 
-        auto path =
-        sys.buildVisualRoute(realPath);
-
-        if(path.empty()){
-
-            res["error"] =
-            "No route";
-
+        if(src == -1 || dest == -1){
+            res["error"] = "Invalid node names";
             return crow::response(res);
         }
 
-        int parkingNode = -1;
+        // Run Dijkstra on REAL nodes only
+        auto realPath = sys.dijkstra(src, dest, sys.road);
 
-        bool fallback = false;
+        if(realPath.empty()){
+            res["error"] = "No route found between these locations";
+            return crow::response(res);
+        }
 
-        // DESTINATION AVAILABLE
-        if(
-            sys.availableAtTime(
-                dest,
-                startH,
-                endH
-            )
-        ){
+        // Expand to visual route (adds ghost nodes for smooth display)
+        auto visualPath = sys.buildVisualRoute(realPath);
 
+        int  parkingNode = -1;
+        bool fallback    = false;
+
+        // Check destination first
+        if(sys.availableAtTime(dest, startH, endH)){
             parkingNode = dest;
         }
-
-        // BACKTRACK
         else{
-
             fallback = true;
 
-            for(
-                int i=path.size()-1;
-                i>=0;
-                i--
-            ){
-
-                int node = path[i];
-
-                if(
-                    sys.nodes[node]
-                    .ghost
-                )
-                    continue;
-
-                if(
-                    sys.availableAtTime(
-                        node,
-                        startH,
-                        endH
-                    )
-                ){
-
-                    parkingNode = node;
-                    break;
-                }
-            }
+            // ---- BUG FIX: search realPath backwards, not visualPath ----
+            parkingNode = sys.fallbackParking(realPath, startH, endH);
         }
 
-        if(parkingNode==-1){
-
-            res["error"] =
-            "No parking available";
-
+        if(parkingNode == -1){
+            res["error"] = "No parking available near your destination";
             return crow::response(res);
         }
 
-        // RESERVE
-        sys.reserveSlot(
-            parkingNode,
-            startH,
-            endH
-        );
+        // Reserve the slot
+        sys.reserveSlot(parkingNode, startH, endH);
 
-        int i=0;
+        // Build visual path up to parking node (if fallback, trim path)
+        vector<int> displayPath = visualPath;
 
-        for(int id : path){
+        if(fallback && parkingNode != dest){
+            // Rebuild visual path only up to parkingNode
+            vector<int> trimmedReal;
+            for(int id : realPath){
+                trimmedReal.push_back(id);
+                if(id == parkingNode) break;
+            }
+            displayPath = sys.buildVisualRoute(trimmedReal);
+        }
 
-            auto n =
-            sys.nodes[id];
-
-            res["path"][i]["x"] =
-            n.x;
-
-            res["path"][i]["y"] =
-            n.y;
-
-            res["path"][i]["ghost"] =
-            n.ghost;
-
+        int i = 0;
+        for(int id : displayPath){
+            auto n = sys.nodes[id];
+            res["path"][i]["x"]     = n.x;
+            res["path"][i]["y"]     = n.y;
+            res["path"][i]["ghost"] = n.ghost;
             i++;
         }
 
-        // TRANSPORT
+        // Transport segment: parking node -> original destination
         if(fallback){
-
-            res["transport"][0]["x"] =
-            sys.nodes[parkingNode].x;
-
-            res["transport"][0]["y"] =
-            sys.nodes[parkingNode].y;
-
-            res["transport"][1]["x"] =
-            sys.nodes[dest].x;
-
-            res["transport"][1]["y"] =
-            sys.nodes[dest].y;
+            res["transport"][0]["x"] = sys.nodes[parkingNode].x;
+            res["transport"][0]["y"] = sys.nodes[parkingNode].y;
+            res["transport"][1]["x"] = sys.nodes[dest].x;
+            res["transport"][1]["y"] = sys.nodes[dest].y;
         }
 
-        res["fallback"] =
-        fallback;
-
-        res["parkingNode"] =
-        sys.nodes[parkingNode]
-        .name;
+        res["fallback"]     = fallback;
+        res["parkingNode"]  = sys.nodes[parkingNode].name;
 
         return crow::response(res);
     });
 
+    // ---- BUG FIX: /update now calls updateCapacity() which preserves reservations ----
     CROW_ROUTE(app,"/update")
     ([](const crow::request& req){
 
         crow::json::wvalue res;
 
-        auto idParam =
-        req.url_params.get("id");
+        auto idParam  = req.url_params.get("id");
+        auto capParam = req.url_params.get("cap");
 
-        auto capParam =
-        req.url_params.get("cap");
-
-        if(
-            !idParam ||
-            !capParam
-        ){
-
+        if(!idParam || !capParam){
             res["success"] = false;
-
+            res["error"]   = "Missing id or cap parameter";
             return crow::response(res);
         }
 
-        int id =
-        stoi(idParam);
+        int id  = stoi(idParam);
+        int cap = stoi(capParam);
 
-        int cap =
-        stoi(capParam);
-
-        if(
-            sys.nodes.find(id)
-            ==
-            sys.nodes.end()
-        ){
-
+        if(cap < 0){
             res["success"] = false;
-
+            res["error"]   = "Capacity cannot be negative";
             return crow::response(res);
         }
 
-        sys.nodes[id]
-        .capacity = cap;
+        if(sys.nodes.find(id) == sys.nodes.end()){
+            res["success"] = false;
+            res["error"]   = "Node not found";
+            return crow::response(res);
+        }
 
-        sys.saveNodes();
+        if(sys.nodes[id].ghost){
+            res["success"] = false;
+            res["error"]   = "Cannot update ghost node";
+            return crow::response(res);
+        }
+
+        // This now correctly updates slots without wiping reservations
+        sys.updateCapacity(id, cap);
 
         res["success"] = true;
 
@@ -394,6 +278,6 @@ int main(){
     });
 
     app.port(18080)
-    .multithreaded()
-    .run();
+       .multithreaded()
+       .run();
 }
