@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<title>
+Smart Parking
+</title>
+
+<link
+rel="stylesheet"
+href="https://unpkg.com/leaflet/dist/leaflet.css"
+/>
+
+<script
+src="https://unpkg.com/leaflet/dist/leaflet.js">
+</script>
+
+<style>
+
+body{
+    margin:0;
+    font-family:Arial;
+}
+
+#map{
+    height:100vh;
+}
+
+.panel{
+
+    position:absolute;
+    top:20px;
+    left:20px;
+
+    z-index:1000;
+
+    background:white;
+
+    width:380px;
+
+    padding:20px;
+
+    border-radius:15px;
+}
+
+input,button{
+
+    width:100%;
+
+    padding:12px;
+
+    margin-top:10px;
+
+    box-sizing:border-box;
+}
+
+button{
+
+    background:#001f6b;
+    color:white;
+    border:none;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="panel">
+
+<h1>
+Smart Parking
+</h1>
+
+<div id="loginBox">
+
+<h2>
+Login
+</h2>
+
+<input
+id="user"
+placeholder="Username"
+/>
+
+<input
+id="pass"
+type="password"
+placeholder="Password"
+/>
+
+<button onclick="login()">
+Login
+</button>
+
+<button onclick="registerUser()">
+Register
+</button>
+
+</div>
+
+<div
+id="mainBox"
+style="display:none;"
+>
+
+<h2>
+Route Search
+</h2>
+
+<input
+id="start"
+placeholder="Start"
+/>
+
+<input
+id="end"
+placeholder="Destination"
+/>
+
+<input
+id="startH"
+type="number"
+min="0"
+max="23"
+placeholder="Start Hour"
+/>
+
+<input
+id="endH"
+type="number"
+min="1"
+max="24"
+placeholder="End Hour"
+/>
+
+<button onclick="findRoute()">
+Find Route
+</button>
+
+<div id="adminPanel"
+style="display:none;"
+>
+
+<h2>
+Admin Panel
+</h2>
+
+<input
+id="nodeId"
+placeholder="Node ID"
+/>
+
+<input
+id="newCap"
+placeholder="New Capacity"
+/>
+
+<button onclick="updateCapacity()">
+Update Capacity
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+<div id="map"></div>
+
+<script>
+
+let map =
+L.map('map')
+.setView(
+    [30.3165,78.0322],
+    13
+);
+
+L.tileLayer(
+'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+).addTo(map);
+
+let markers = [];
+
+let routeLine = null;
+
+let transportLine = null;
+
+function loadNodes(){
+
+    fetch("/nodes")
+
+    .then(res => res.json())
+
+    .then(data => {
+
+        markers.forEach(
+            m => map.removeLayer(m)
+        );
+
+        markers = [];
+
+        data.forEach(n => {
+
+            let marker =
+            L.marker(
+                [n.y,n.x]
+            ).addTo(map);
+
+            marker.bindPopup(
+
+                "<b>"
+                + n.name +
+                "</b><br>"
+                +
+                "Parking: "
+                +
+                n.capacity
+            );
+
+            markers.push(marker);
+        });
+    });
+}
+
+loadNodes();
+
+function login(){
+
+    let user =
+    document
+    .getElementById("user")
+    .value;
+
+    let pass =
+    document
+    .getElementById("pass")
+    .value;
+
+    fetch(
+
+        "/login?user="
+        +
+        encodeURIComponent(user)
+        +
+        "&pass="
+        +
+        encodeURIComponent(pass)
+
+    )
+
+    .then(res => res.json())
+
+    .then(data => {
+
+        if(!data.success){
+
+            alert(
+                "Invalid Login"
+            );
+
+            return;
+        }
+
+        document
+        .getElementById("loginBox")
+        .style.display =
+        "none";
+
+        document
+        .getElementById("mainBox")
+        .style.display =
+        "block";
+
+        if(
+            data.role
+            ==
+            "admin"
+        ){
+
+            document
+            .getElementById("adminPanel")
+            .style.display =
+            "block";
+        }
+    });
+}
+
+function registerUser(){
+
+    let user =
+    document
+    .getElementById("user")
+    .value;
+
+    let pass =
+    document
+    .getElementById("pass")
+    .value;
+
+    fetch(
+
+        "/register?user="
+        +
+        encodeURIComponent(user)
+        +
+        "&pass="
+        +
+        encodeURIComponent(pass)
+
+    )
+
+    .then(res => res.json())
+
+    .then(data => {
+
+        if(data.success){
+
+            alert(
+                "Registration Success"
+            );
+        }
+
+        else{
+
+            alert(
+                data.error
+            );
+        }
+    });
+}
+
+function findRoute(){
+
+    let start =
+    document
+    .getElementById("start")
+    .value;
+
+    let end =
+    document
+    .getElementById("end")
+    .value;
+
+    let startH =
+    document
+    .getElementById("startH")
+    .value;
+
+    let endH =
+    document
+    .getElementById("endH")
+    .value;
+
+    fetch(
+
+        "/route?start="
+        +
+        encodeURIComponent(start)
+        +
+        "&end="
+        +
+        encodeURIComponent(end)
+        +
+        "&startH="
+        +
+        startH
+        +
+        "&endH="
+        +
+        endH
+
+    )
+
+    .then(res => res.json())
+
+    .then(data => {
+
+        if(data.error){
+
+            alert(
+                data.error
+            );
+
+            return;
+        }
+
+        if(routeLine)
+            map.removeLayer(routeLine);
+
+        if(transportLine)
+            map.removeLayer(
+                transportLine
+            );
+
+        let coords = [];
+
+        data.path.forEach(p => {
+
+            coords.push(
+                [p.y,p.x]
+            );
+        });
+
+        routeLine =
+        L.polyline(
+            coords,
+            {
+                color:'blue'
+            }
+        ).addTo(map);
+
+        if(data.fallback){
+
+            let t = [];
+
+            data.transport.forEach(p => {
+
+                t.push(
+                    [p.y,p.x]
+                );
+            });
+
+            transportLine =
+            L.polyline(
+                t,
+                {
+                    color:'red',
+                    dashArray:'10,10'
+                }
+            ).addTo(map);
+
+            alert(
+                "Destination Full\n"
+                +
+                "Parking Reserved At: "
+                +
+                data.parkingNode
+                +
+                "\nUse Public Transport"
+            );
+        }
+
+        else{
+
+            alert(
+                "Parking Reserved At "
+                +
+                data.parkingNode
+            );
+        }
+
+        loadNodes();
+    });
+}
+
+function updateCapacity(){
+
+    let id =
+    document
+    .getElementById("nodeId")
+    .value;
+
+    let cap =
+    document
+    .getElementById("newCap")
+    .value;
+
+    fetch(
+
+        "/update?id="
+        +
+        id
+        +
+        "&cap="
+        +
+        cap
+
+    )
+
+    .then(res => res.json())
+
+    .then(data => {
+
+        if(data.success){
+
+            alert(
+                "Updated"
+            );
+
+            loadNodes();
+        }
+
+        else{
+
+            alert(
+                "Failed"
+            );
+        }
+    });
+}
+
+</script>
+
+</body>
+</html>
