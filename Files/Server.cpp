@@ -3,11 +3,7 @@
 
 using namespace std;
 
-bool loginUser(
-    const string& user,
-    const string& pass,
-    string& role
-){
+bool loginUser(const string& user,const string& pass,string& role) {
     ifstream file("./UserFiles/users.txt");
 
     if(!file.is_open()) return false;
@@ -26,10 +22,7 @@ bool loginUser(
     return false;
 }
 
-bool registerUser(
-    const string& user,
-    const string& pass
-){
+bool registerUser(const string& user, const string& pass){
     ifstream check("./UserFiles/users.txt");
 
     string u,p,r;
@@ -58,10 +51,7 @@ int main(){
 
         ifstream file("index.html");
 
-        string html(
-            (istreambuf_iterator<char>(file)),
-            istreambuf_iterator<char>()
-        );
+        string html((istreambuf_iterator<char>(file)),istreambuf_iterator<char>());
 
         return crow::response(html);
     });
@@ -266,7 +256,5 @@ int main(){
         return crow::response(res);
     });
 
-    app.port(18080)
-       .multithreaded()
-       .run();
+    app.port(18080).multithreaded().run();
 }

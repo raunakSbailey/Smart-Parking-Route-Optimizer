@@ -64,7 +64,7 @@ public:
         int u,v,w;
 
         while(file>>u>>v>>w){
-            road[u].push_back({v,w});
+            road[u].push_back({v,w} );
             road[v].push_back({u,w});
         }
 
@@ -135,17 +135,8 @@ public:
         return -1;
     }
 
-    vector<int> dijkstra(
-        int src,
-        int dest,
-        const map<int,vector<pair<int,int>>>& graph
-    ) const {
-
-        priority_queue<
-            pair<int,int>,
-            vector<pair<int,int>>,
-            greater<pair<int,int>>
-        > pq;
+    vector<int> dijkstra(int src,int dest,const map<int,vector<pair<int,int>>>& graph) const {
+        priority_queue<pair<int,int>,vector<pair<int,int>>,greater<pair<int,int>>> pq;
 
         map<int,int> dist;
         map<int,int> parent;
@@ -157,8 +148,8 @@ public:
         }
 
         if(dist.find(src) == dist.end() || dist.find(dest) == dist.end()){
-            return {};
-        }
+            re
+        }turn {};
 
         dist[src] = 0;
         pq.push({0, src});
@@ -262,10 +253,7 @@ public:
         }
     }
 
-    int fallbackParking(
-        const vector<int>& realPath,
-        int startH,
-        int endH
+    int fallbackParking(const vector<int>& realPath, int startH, int endH
     ){
         for(int i = (int)realPath.size()-1; i >= 0; i--){
 
